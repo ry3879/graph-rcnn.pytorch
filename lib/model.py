@@ -254,6 +254,27 @@ class SceneGraphGeneration:
                 )
             if self.cfg.instance > 0 and i > self.cfg.instance:
                 break
+
+            '''
+            print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+            top_predictions_box = select_top_predictions(output[0])
+            top_predictions_idx = top_predictions_box.get_field("labels")
+
+            top_triplet = get_top_triplet(top_predictions_idx, output[0], output_pred[0])
+
+
+            # print("top_predictions length: ", len(top_predictions_idx))
+            # print("top_predictions : ", top_predictions_idx)
+            for (obj1, rel, obj2, rel_score) in top_triplet:
+                obj_1 = self.data_loader_test.dataset.ind_to_classes[obj1]
+                obj_2 = self.data_loader_test.dataset.ind_to_classes[obj2]
+                rel_ = self.data_loader_test.dataset.ind_to_predicates[rel]
+                if rel_score > 0.00:
+                    print("img: {}, {},  {},  {}: {}".format(i, obj_1, rel_, obj_2, rel_score))
+            
+            print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+            '''
+
         synchronize()
         total_time = total_timer.toc()
         total_time_str = get_time_str(total_time)
@@ -305,3 +326,21 @@ class SceneGraphGeneration:
 
 def build_model(cfg, arguments, local_rank, distributed):
     return SceneGraphGeneration(cfg, arguments, local_rank, distributed)
+
+def get_top_triplet(top_predictions_idx, output, output_pred):
+    rel_box = output_pred.get_field("scores")
+    rel_box = torch.max(rel_box, dim=1)
+
+    rel_scores = rel_box[0]
+    rel_idxs = rel_box[1]
+    rel_pairs = output_pred.get_field("idx_pairs")
+    triplet = []
+
+    for i, (obj1,obj2) in enumerate(rel_pairs):
+        if len(top_predictions_idx) > obj1-1 and len(top_predictions_idx) > obj2-1:
+            obj_i = top_predictions_idx[int(obj1)-1]
+            obj_j = top_predictions_idx[int(obj2)-1]
+            relationship = rel_idxs[i]
+            triplet.append([obj_i,relationship,obj_j,rel_scores[i]])
+    return triplet
+
